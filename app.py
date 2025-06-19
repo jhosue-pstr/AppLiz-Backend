@@ -64,7 +64,7 @@ from src.routes.periods import period_bp
 from src.routes.emergency_contacts import contacts_bp
 from src.routes.resources import resources_bp
 from src.routes.chat import chats_bp
-
+from src.routes.rewards import rewards_bp
 # Registrar todos los blueprints
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(users_bp, url_prefix='/api/users')
@@ -76,7 +76,7 @@ app.register_blueprint(period_bp, url_prefix='/api/period')
 app.register_blueprint(contacts_bp, url_prefix='/api/emergency-contacts')
 app.register_blueprint(resources_bp, url_prefix='/api/resources')
 app.register_blueprint(chats_bp, url_prefix='/api/chats')
-
+app.register_blueprint(rewards_bp, url_prefix='/api/rewards')
 # Importar y registrar namespaces de SocketIO
 from src.sockets.chat import ChatNamespace
 socketio.on_namespace(ChatNamespace('/chat'))
