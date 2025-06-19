@@ -103,3 +103,15 @@ class User:
             raise e
         finally:
             Database.close_connection(connection, cursor)
+
+
+
+    @staticmethod
+    def get_all_except(user_id):
+        connection = Database.get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT id, name, avatar_url FROM users WHERE id != %s", (user_id,))
+            return cursor.fetchall()
+        finally:
+            Database.close_connection(connection, cursor)

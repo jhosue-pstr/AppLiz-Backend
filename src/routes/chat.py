@@ -64,13 +64,21 @@ def create_private_chat():
         chat_id = Chat.get_or_create_private_chat(request.user_id, data['user_id'])
         if not chat_id:
             return jsonify({"success": False, "error": "No se pudo crear el chat"}), 500
+        
+        # Obtener detalles del chat recién creado
+        chat = Chat.get_chat_details(chat_id)
+        participants = Chat.get_participants(chat_id)
             
         return jsonify({
             "success": True,
-            "chat_id": chat_id
+            "chat_id": chat_id,
+            "chat_name": chat['name'],
+            "participants": participants
         }), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
 
 @chats_bp.route('/group', methods=['POST'])
 @token_required
@@ -199,3 +207,51 @@ def upload_file():
         }), 200
         
     return jsonify({"success": False, "error": "Tipo de archivo no permitido"}), 400
+
+
+
+
+
+@chats_bp.route('/<int:chat_id>/participants', methods=['GET'])
+@token_required
+def get_chat_participants(chat_id):
+    """Obtiene la lista de participantes de un chat"""
+    try:
+        participants = Chat.get_participants(chat_id)
+        return jsonify({
+            "success": True,
+            "participants": participants
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@chats_bp.route('/<int:chat_id>/participants', methods=['POST'])
+@token_required
+def add_participant(chat_id):
+    """Agrega un nuevo participante a un chat grupal"""
+    data = request.get_json()
+    if not data or 'user_id' not in data:
+        return jsonify({"success": False, "error": "user_id requerido"}), 400
+
+    try:
+        success = Chat.add_participant(chat_id, data['user_id'], data.get('is_admin', False))
+        if success:
+            return jsonify({"success": True}), 200
+        return jsonify({"success": False, "error": "No se pudo agregar participante"}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+@chats_bp.route('/<int:chat_id>', methods=['DELETE'])
+@token_required
+def delete_chat(chat_id):
+    """Elimina un chat"""
+    try:
+        success = Chat.delete_chat(chat_id, request.user_id)
+        if success:
+            return jsonify({"success": True}), 200
+        return jsonify({"success": False, "error": "No tienes permisos o el chat no existe"}), 403
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
