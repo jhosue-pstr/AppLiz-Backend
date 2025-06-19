@@ -177,12 +177,12 @@ def internal_error(error):
 
 # Ejecutar servidor
 if __name__ == '__main__':
-    print("🔧 Servidor iniciando en http://0.0.0.0:5000")
+    port = int(os.environ.get("PORT", 5000))  # Usa el puerto de Railway o 5000 local
+    print(f"🔧 Servidor iniciando en http://0.0.0.0:{port}")
     socketio.run(
         app,
         host='0.0.0.0',
-        port=5000,
-        debug=True,
-        use_reloader=True,
-        log_output=True
+        port=port,  # ¡Importante! Usa la variable PORT
+        debug=False,  # En producción, debug debe ser False
+        use_reloader=False  # Desactiva el reloader en producción
     )
