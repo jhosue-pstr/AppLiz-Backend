@@ -93,77 +93,77 @@ class EmotionDiary:
             Database.close_connection(connection, cursor)
 
 # Modifica el método detect_patterns en EmotionDiary
-@staticmethod
-def detect_patterns(user_id):
-    connection = Database.get_connection()
-    cursor = connection.cursor(dictionary=True)
-    try:
+    @staticmethod
+    def detect_patterns(user_id):
+        connection = Database.get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
         # Consulta mejorada para patrones
-        cursor.execute(
-            """SELECT 
-                DAYNAME(created_at) as day,
-                HOUR(created_at) as hour,
-                emotion,
-                COUNT(*) as count,
-                AVG(intensity) as avg_intensity
-            FROM diary_entries
-            WHERE user_id = %s
-            GROUP BY day, hour, emotion
-            HAVING COUNT(*) > 1
-            ORDER BY count DESC""",
-            (user_id,)
-        )
-        results = cursor.fetchall()
+            cursor.execute(
+                """SELECT 
+                    DAYNAME(created_at) as day,
+                    HOUR(created_at) as hour,
+                    emotion,
+                    COUNT(*) as count,
+                    AVG(intensity) as avg_intensity
+                FROM diary_entries
+                WHERE user_id = %s
+                GROUP BY day, hour, emotion
+                HAVING COUNT(*) > 1
+                ORDER BY count DESC""",
+                (user_id,)
+            )
+            results = cursor.fetchall()
         
-        if not results:
-            return {
-                "patterns": [],
-                "most_common": None,
-                "time_patterns": None
-            }
+            if not results:
+                return {
+                    "patterns": [],
+                    "most_common": None,
+                    "time_patterns": None
+                }
         
         # Procesamiento más completo de los resultados
-        day_patterns = {}
-        time_patterns = {}
+            day_patterns = {}
+            time_patterns = {}
         
-        for row in results:
-            day = row['day']
-            hour = row['hour']
-            emotion = row['emotion']
+            for row in results:
+                day = row['day']
+                hour = row['hour']
+                emotion = row['emotion']
             
             # Patrones por día
-            if day not in day_patterns:
-                day_patterns[day] = []
-            day_patterns[day].append({
-                'emotion': emotion,
-                'count': row['count'],
-                'avg_intensity': float(row['avg_intensity'])
-            })
+                if day not in day_patterns:
+                    day_patterns[day] = []
+                day_patterns[day].append({
+                    'emotion': emotion,
+                    'count': row['count'],
+                    'avg_intensity': float(row['avg_intensity'])
+                })
             
             # Patrones por hora
-            if hour not in time_patterns:
-                time_patterns[hour] = []
-            time_patterns[hour].append({
-                'emotion': emotion,
-                'count': row['count']
-            })
+                if hour not in time_patterns:
+                    time_patterns[hour] = []
+                time_patterns[hour].append({
+                    'emotion': emotion,
+                    'count': row['count']
+                })
         
         # Encontrar el patrón más común
-        most_common = max(results, key=lambda x: x['count'], default=None)
+            most_common = max(results, key=lambda x: x['count'], default=None)
         
-        return {
-            "success": True,
-            "patterns": results,
-            "day_patterns": day_patterns,
-            "time_patterns": time_patterns,
-            "most_common": {
-                "day": most_common['day'] if most_common else None,
-                "hour": most_common['hour'] if most_common else None,
-                "emotion": most_common['emotion'] if most_common else None,
-                "count": most_common['count'] if most_common else None
+            return {
+                "success": True,
+                "patterns": results,
+                "day_patterns": day_patterns,
+                "time_patterns": time_patterns,
+                "most_common": {
+                    "day": most_common['day'] if most_common else None,
+                    "hour": most_common['hour'] if most_common else None,
+                    "emotion": most_common['emotion'] if most_common else None,
+                    "count": most_common['count'] if most_common else None
+                }
             }
-        }
-    finally:
-        Database.close_connection(connection, cursor)
+        finally:
+            Database.close_connection(connection, cursor)
 
 

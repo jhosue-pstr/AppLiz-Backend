@@ -52,7 +52,7 @@ class Chat:
         connection = Database.get_connection()
         cursor = connection.cursor(dictionary=True)
         try:
-            # Buscar si ya existe un chat privado entre estos usuarios
+        # Buscar si ya existe un chat privado entre estos usuarios
             cursor.execute("""
                 SELECT c.id 
                 FROM chats c
@@ -61,24 +61,28 @@ class Chat:
                 WHERE c.is_group = 0
                 LIMIT 1
             """, (user1_id, user2_id))
-            
+        
             existing_chat = cursor.fetchone()
-            
+        
             if existing_chat:
                 return existing_chat['id']
-            
-            # Si no existe, crear uno nuevo
-            chat_name = f"Chat privado {user1_id}-{user2_id}"
+        
+        # Obtener el nombre del otro usuario para el chat
+            cursor.execute("SELECT name FROM users WHERE id = %s", (user2_id,))
+            other_user = cursor.fetchone()
+            chat_name = other_user['name'] if other_user else f"Usuario {user2_id}"
+        
+        # Crear el chat con el nombre del otro usuario
             cursor.execute(
                 """INSERT INTO chats 
                 (name, is_group, created_by, created_at, last_message_at) 
                 VALUES (%s, 0, %s, NOW(), NOW())""",
                 (chat_name, user1_id)
             )
-            
+        
             chat_id = cursor.lastrowid
-            
-            # Añadir ambos participantes
+        
+        # Añadir ambos participantes
             for user_id in [user1_id, user2_id]:
                 cursor.execute(
                     """INSERT INTO chat_participants 
@@ -86,7 +90,7 @@ class Chat:
                     VALUES (%s, %s, %s, NOW(), 'active')""",
                     (chat_id, user_id, False)
                 )
-            
+        
             connection.commit()
             return chat_id
         except Exception as e:
@@ -102,27 +106,30 @@ class Chat:
         connection = Database.get_connection()
         cursor = connection.cursor(dictionary=True)
         try:
+            
             cursor.execute(
-                """SELECT 
-                    c.id,
-                    c.name,
-                    c.is_group,
-                    c.theme,
-                    c.photo_url,
-                    c.last_message_at,
-                    (SELECT COUNT(*) FROM messages m 
-                     WHERE m.chat_id = c.id AND m.read_at IS NULL AND m.user_id != %s) as unread_count,
-                    (SELECT content FROM messages 
-                     WHERE chat_id = c.id AND deleted_at IS NULL 
-                     ORDER BY sent_at DESC LIMIT 1) as last_message_content,
-                    (SELECT u.name FROM messages 
-                     JOIN users u ON messages.user_id = u.id 
-                     WHERE chat_id = c.id AND deleted_at IS NULL 
-                     ORDER BY sent_at DESC LIMIT 1) as last_message_sender
-                FROM chats c
-                JOIN chat_participants cp ON c.id = cp.chat_id
-                WHERE cp.user_id = %s AND cp.left_at IS NULL
-                ORDER BY c.last_message_at DESC""",
+                """
+            SELECT 
+                c.id,
+                c.name,
+                c.is_group,
+                c.theme,
+                c.photo_url,
+                c.last_message_at,
+                (SELECT COUNT(*) FROM messages m 
+                 WHERE m.chat_id = c.id AND m.read_at IS NULL AND m.user_id != %s) as unread_count,
+                (SELECT content FROM messages 
+                 WHERE chat_id = c.id AND deleted_at IS NULL 
+                 ORDER BY sent_at DESC LIMIT 1) as last_message_content,
+                (SELECT u.name FROM messages 
+                 JOIN users u ON messages.user_id = u.id 
+                 WHERE chat_id = c.id AND deleted_at IS NULL 
+                 ORDER BY sent_at DESC LIMIT 1) as last_message_sender
+            FROM chats c
+            JOIN chat_participants cp ON c.id = cp.chat_id
+            WHERE cp.user_id = %s AND cp.left_at IS NULL 
+            ORDER BY c.last_message_at DESC
+        """,
                 (user_id, user_id)
             )
             return cursor.fetchall()
@@ -209,12 +216,20 @@ class Chat:
         connection = Database.get_connection()
         cursor = connection.cursor()
         try:
+        # Bloquea el registro primero para evitar conflictos
+            cursor.execute(
+                "SELECT id FROM chats WHERE id = %s FOR UPDATE",
+                (chat_id,)
+            )
+
+        # Ahora haces el update con seguridad
             cursor.execute(
                 """UPDATE chats 
                 SET last_message_at = NOW() 
                 WHERE id = %s""",
                 (chat_id,)
             )
+
             connection.commit()
         except Exception as e:
             print(f"Error en Chat.update_last_message(): {str(e)}")
@@ -338,6 +353,54 @@ class Message:
         except Exception as e:
             print(f"Error en Message.delete(): {str(e)}")
             connection.rollback()
+            return False
+        finally:
+            Database.close_connection(connection, cursor)
+
+
+
+    @staticmethod
+    def delete_chat(chat_id, user_id):
+        """Elimina un chat (solo para grupos o si es admin)"""
+        connection = Database.get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+        # Verificar si el usuario es admin o es chat privado
+            cursor.execute("""
+                SELECT c.is_group, cp.is_admin 
+                FROM chats c
+                JOIN chat_participants cp ON c.id = cp.chat_id
+                WHERE c.id = %s AND cp.user_id = %s
+            """, (chat_id, user_id))
+        
+            chat_info = cursor.fetchone()
+        
+            if not chat_info:
+                return False
+            
+        # Solo permitir eliminar si es admin o chat privado
+            if chat_info['is_group'] and not chat_info['is_admin']:
+                return False
+            
+        # Marcar el chat como eliminado (borrado lógico)
+            cursor.execute("""
+                UPDATE chats 
+                SET deleted_at = NOW() 
+                WHERE id = %s
+            """, (chat_id,))
+        
+        # Marcar que el usuario abandonó el chat
+            cursor.execute("""
+                UPDATE chat_participants
+                SET left_at = NOW(), status = 'inactive'
+                WHERE chat_id = %s AND user_id = %s
+            """, (chat_id, user_id))
+        
+            connection.commit()
+            return True
+        except Exception as e:
+            connection.rollback()
+            print(f"Error en Chat.delete_chat(): {str(e)}")
             return False
         finally:
             Database.close_connection(connection, cursor)

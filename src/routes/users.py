@@ -71,3 +71,24 @@ def update_password():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+
+@users_bp.route('/<int:user_id>', methods=['GET'])
+@token_required
+def get_user_by_id(user_id):
+    """Obtiene datos públicos de otro usuario (para mostrar en chat, etc.)"""
+    user = User.get_by_id(user_id)
+    if not user:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    # Devolver solo info pública
+    return jsonify({
+        "id": user["id"],
+        "name": user["name"],
+        "avatar_url": user["avatar_url"]
+    }), 200
+
+
+@users_bp.route('/', methods=['GET'])
+@token_required
+def listar_usuarios():
+    usuarios = User.get_all_except(request.user_id)
+    return jsonify({"users": usuarios}), 200
