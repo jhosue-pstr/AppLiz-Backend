@@ -27,3 +27,15 @@ def redeem_reward():
     if success:
         return jsonify({"message": "Recompensa canjeada"}), 200
     return jsonify({"error": "Puntos insuficientes o recompensa no disponible"}), 400
+@rewards_bp.route('/subtract-points', methods=['POST'])
+@token_required
+def subtract_points():
+    data = request.get_json()
+    points_to_subtract = data['points']
+    
+    # Llama directamente al método para restar puntos
+    success = PointSystem.subtract_points(request.user_id, points_to_subtract)
+    
+    if success:
+        return jsonify({"message": "Puntos restados correctamente", "new_balance": PointSystem.get_balance(request.user_id)}), 200
+    return jsonify({"error": "No tienes suficientes puntos"}), 400
